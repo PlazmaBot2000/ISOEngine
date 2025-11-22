@@ -1,7 +1,8 @@
 #include <SDL2/SDL.h>
-#ifndef SCRIPTS_H
-#define SCRIPTS_H
+#ifndef MODULES_H
+#define MODULES_H
 
-void loop(SDL_Renderer *renderer);
-void start(SDL_Renderer *renderer);
+bool ISOEngine_Delay(int time, int& Prev_Tick);
+int ISOEngine_Random(int upper, int lower);
+
 #endif
