@@ -1,10 +1,13 @@
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_image.h>
 #include <bits/stdc++.h>
 #include "ISOEngine.h"
 #include "Scripts.h"
 
 const int TARGET_FPS = 60;
 const int FRAME_DELAY_MS = 1000 / TARGET_FPS;
+const int WINDOW_WIDTH = 1000;
+const int WINDOW_HEIGHT = 1000;
 
 int main() {
     if (SDL_Init(SDL_INIT_VIDEO)) {
@@ -14,7 +17,7 @@ int main() {
     SDL_Window   *window   = nullptr;
     SDL_Renderer *renderer = nullptr;
 	
-    if (SDL_CreateWindowAndRenderer(1000, 1000, SDL_WINDOW_SHOWN | SDL_WINDOW_INPUT_FOCUS, &window, &renderer)) {
+    if (SDL_CreateWindowAndRenderer(WINDOW_HEIGHT, WINDOW_HEIGHT, SDL_WINDOW_SHOWN | SDL_WINDOW_INPUT_FOCUS, &window, &renderer)) {
         std::cerr << "Failed to create window and renderer: " << SDL_GetError() << std::endl;
         return -1;
     }
