@@ -3,6 +3,16 @@
 #include <SDL2/SDL_image.h>
 #include <bits/stdc++.h>
 
+int ISOEngine_GetAxis::y(){
+	const Uint8 *keyState = SDL_GetKeyboardState(NULL);
+	return std::max(-1, std::min((keyState[SDL_SCANCODE_S] - keyState[SDL_SCANCODE_W] + keyState[SDL_SCANCODE_DOWN] - keyState[SDL_SCANCODE_UP]), 1));
+}
+
+int ISOEngine_GetAxis::x(){
+	const Uint8 *keyState = SDL_GetKeyboardState(NULL);
+	return std::max(-1, std::min((keyState[SDL_SCANCODE_D] - keyState[SDL_SCANCODE_A] + keyState[SDL_SCANCODE_RIGHT] - keyState[SDL_SCANCODE_LEFT]), 1));
+}
+
 bool ISOEngine_Delay(int time, int& Prev_Tick){
 	int diff = SDL_GetTicks() - Prev_Tick;
 	if(diff >= time){
@@ -27,6 +37,19 @@ int ISOEngine_GetWindowHeight(SDL_Window *window){
 	SDL_GetWindowSize(window, nullptr, &h);
 	return h;
 }
+
+//std::array<int, 2> ISOEngine_GetAxis()
+
+
+
+
+
+
+
+
+
+
+
 
 SDL_Texture* LoadImage(SDL_Window *window, SDL_Renderer *renderer, std::string file){
    SDL_Surface *loadedImage = nullptr;
