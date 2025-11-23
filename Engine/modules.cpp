@@ -16,6 +16,18 @@ int ISOEngine_Random(int upper, int lower){
 	return (rand() % (upper-lower) + 1);
 }
 
+int ISOEngine_GetWindowWidth(SDL_Window *window){
+	int w;
+	SDL_GetWindowSize(window, &w, nullptr);
+	return w;
+}
+
+int ISOEngine_GetWindowHeight(SDL_Window *window){
+	int h;
+	SDL_GetWindowSize(window, nullptr, &h);
+	return h;
+}
+
 SDL_Texture* LoadImage(SDL_Window *window, SDL_Renderer *renderer, std::string file){
    SDL_Surface *loadedImage = nullptr;
    SDL_Texture *texture = nullptr;
