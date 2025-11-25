@@ -38,30 +38,14 @@ int ISOEngine_GetWindowHeight(SDL_Window *window){
 	return h;
 }
 
-//std::array<int, 2> ISOEngine_GetAxis()
-
-
-
-
-
-
-
-
-
-
-
-
-SDL_Texture* LoadImage(SDL_Window *window, SDL_Renderer *renderer, std::string file){
-   SDL_Surface *loadedImage = nullptr;
-   SDL_Texture *texture = nullptr;
-    loadedImage = SDL_LoadBMP(file.c_str());
-   if (loadedImage != nullptr){
-       texture = SDL_CreateTextureFromSurface(renderer, loadedImage);
-       SDL_FreeSurface(loadedImage);
-   }
-   else
-       std::cout << SDL_GetError() << std::endl;
-   return texture;
+SDL_Texture* LoadImage(SDL_Window *window, SDL_Renderer *renderer, const char* file_path){
+    SDL_Texture* texture = IMG_LoadTexture(renderer, file_path);
+    if (!texture) {
+        printf("Failed to load texture: %s\n", IMG_GetError());
+    } else {
+        SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);
+    }
+    return texture;
 }
 
 void RenderScalableTexture(SDL_Texture *texture, SDL_Renderer *renderer, int x, int y, int w, int h){
@@ -77,4 +61,24 @@ void RenderTexture(SDL_Texture *texture, SDL_Renderer *renderer, int x, int y){
 	int w, h;
 	SDL_QueryTexture(texture, NULL, NULL, &w, &h);
 	RenderScalableTexture(texture, renderer, x, y, w, h);
+}
+
+int ISOEngine_GetTextureHeight(SDL_Texture *texture){
+	int height;
+	if (SDL_QueryTexture(texture, nullptr, nullptr, nullptr, &height) != 0){
+    	fprintf(stderr, "Error querying texture: %s\n", SDL_GetError());
+		return 0;
+	}else{
+    	return height;
+	}
+}
+
+int ISOEngine_GetTextureWidth(SDL_Texture *texture){
+	int width;
+	if (SDL_QueryTexture(texture, nullptr, nullptr, &width, nullptr) != 0){
+    	fprintf(stderr, "Error querying texture: %s\n", SDL_GetError());
+		return 0;
+	}else{
+    	return width;
+	}
 }
