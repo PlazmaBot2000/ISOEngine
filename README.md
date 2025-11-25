@@ -2,6 +2,7 @@
 It will be isometric game engine based on SDL2.
 # Dependencies:
 - SDL2
+- SDL2_Image
 - bits/stdc++
 # How to compile:
 ```
