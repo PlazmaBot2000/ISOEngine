@@ -3,7 +3,7 @@
 #ifndef SCRIPTS_H
 #define SCRIPTS_H
 
-void loop(SDL_Window *window, SDL_Renderer *renderer);
-void start(SDL_Window *window, SDL_Renderer *renderer);
+int loop(SDL_Window *window, SDL_Renderer *renderer);
+int start(SDL_Window *window, SDL_Renderer *renderer);
 
 #endif

@@ -1,21 +1,29 @@
 #include <SDL2/SDL.h>
-#include <SDL2/SDL_image.h>
-#include <bits/stdc++.h>
-#include "ISOEngine.h"
+#include <iostream>
+#include <toml++/toml.hpp>
 #include "Scripts.h"
 
-const int TARGET_FPS = 60;
-const int FRAME_DELAY_MS = 1000 / TARGET_FPS;
-const int WINDOW_WIDTH = 1900;
-const int WINDOW_HEIGHT = 1190;
+toml::table Engine_Config;
 
 int main() {
+	try {
+        Engine_Config = toml::parse_file("/home/plazma/Coding/C++/ISOEngine_v2/Engine/Engine_Config.toml");
+    } catch (const toml::parse_error& err) {
+        std::cerr << "Error parsing file: " << err.description() << std::endl;
+        std::cerr << "  Occurred at: " << err.source() << std::endl;
+        return 1;
+    }
+
+	int TARGET_FPS = Engine_Config["TARGET_FPS"].value_or(60);
+	int FRAME_DELAY_MS = 1000 / TARGET_FPS;
+	int WINDOW_WIDTH = Engine_Config["WINDOW_WIDTH"].value_or(1920);
+	int WINDOW_HEIGHT = Engine_Config["WINDOW_HEIGHT"].value_or(1080);
+
+
     if (SDL_Init(SDL_INIT_VIDEO)) {
 		std::cerr << "Failed to initialize SDL: " << SDL_GetError() << std::endl;
         return -1;
     }
-
-	IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG);
 
     SDL_Window   *window   = nullptr;
     SDL_Renderer *renderer = nullptr;
@@ -24,12 +32,13 @@ int main() {
         std::cerr << "Failed to create window and renderer: " << SDL_GetError() << std::endl;
         return -1;
     }
-
-    SDL_SetWindowTitle(window, "ISOEngine");
-	SDL_SetRenderDrawColor(renderer, 34, 32, 52, 255);
+	
+	SDL_SetWindowTitle(window, "Engine");
+	SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
 
 	bool game_is_running = true;
-	start(window, renderer);
+	if(start(window, renderer) != 0) game_is_running = false;
+
     while (game_is_running) { // main game loop
 		Uint32 frameStart = SDL_GetTicks();
 
@@ -40,7 +49,9 @@ int main() {
 		}
 		SDL_RenderClear(renderer); // re-draw the window
 
-		loop(window, renderer);
+		if(loop(window, renderer) != 0){
+			game_is_running = false;
+		}
         SDL_RenderPresent(renderer);
 
 		int frameTime = SDL_GetTicks() - frameStart;
