@@ -184,14 +184,26 @@ enum class ScaleMode {
 	Repeat     // Замощение (с повторением изображения)
 };
 
+
+enum class PhysicsType {
+	Static,		// Объект недвижим
+	Kinematic,	// Объект можно двигать но он не падает
+	Dynamic		// На объект действую внешние физические силы
+};
+
 class GameObject {
 public:
     Collider collider;
-	float velocityX = 0.0f;
-    float velocityY = 0.0f;
+    
+    PhysicsType physicsType = PhysicsType::Static;
+    Vector2D velocity = {0, 0};
+    Vector2D acceleration = {0, 0};
+    float mass = 1.0f;
+    float friction = 0.95f;
+    float gravityScale = 1.0f;
     
     SDL_Texture* texture = nullptr;
-    int texW, texH;
+    int texW = 0, texH = 0;
     ScaleMode scaleMode = ScaleMode::Stretch;
 
     void loadTexture(SDL_Renderer* renderer, const char* filePath) {
@@ -203,95 +215,75 @@ public:
         }
     }
 
+    void applyForce(Vector2D force) {
+        if (physicsType == PhysicsType::Dynamic && mass > 0) {
+            acceleration.x += force.x / mass;
+            acceleration.y += force.y / mass;
+        }
+    }
+
+    void updatePosition(const std::vector<GameObject*>& otherObjects) {
+        if (physicsType == PhysicsType::Static) return;
+
+        if (physicsType == PhysicsType::Dynamic) {
+            applyForce({0, 0.5f * gravityScale});
+
+            velocity.x += acceleration.x;
+            velocity.y += acceleration.y;
+            
+            velocity.x *= friction;
+            velocity.y *= friction;
+
+            acceleration = {0, 0};
+        }
+
+        collider.x += velocity.x;
+        resolveCollisions(otherObjects, true);
+
+        collider.y += velocity.y;
+        resolveCollisions(otherObjects, false);
+    }
+
     void draw(SDL_Renderer* renderer) const {
         if (!texture) return;
 
-        SDL_Rect renderRect;
-        
-			if (scaleMode == ScaleMode::Repeat) {
-        	SDL_Rect clipRect = { (int)collider.x, (int)collider.y, (int)collider.width, (int)collider.height };
-        
-        	SDL_Rect oldClip;
-        	SDL_RenderGetClipRect(renderer, &oldClip);
-        	SDL_RenderSetClipRect(renderer, &clipRect);
-
-        	for (int py = 0; py < (int)collider.height; py += texH) {
-            	for (int px = 0; px < (int)collider.width; px += texW) {
-                	SDL_Rect dest = { 
-                    	(int)collider.x + px, 
-                    	(int)collider.y + py, 
-                    	texW, 
-                    	texH 
-                	};
-                
-                	SDL_RenderCopyEx(renderer, texture, NULL, &dest, collider.angleDegrees, NULL, SDL_FLIP_NONE);
-            	}
-        	}
-
-        	SDL_RenderSetClipRect(renderer, (SDL_RectEmpty(&oldClip) ? NULL : &oldClip));
-    	} else {
-        	if (scaleMode == ScaleMode::Stretch) {
-            	renderRect = { (int)collider.x, (int)collider.y, (int)collider.width, (int)collider.height };
-        	} 
-        	else {
-            	float texRatio = (float)texW / texH;
-            	float colRatio = collider.width / collider.height;
-            	int finalW, finalH;
-
-            	if (scaleMode == ScaleMode::Fit) {
-                	if (colRatio > texRatio) {
-                    	finalH = (int)collider.height;
-                    	finalW = (int)(collider.height * texRatio);
-                	} else {
-                    	finalW = (int)collider.width;
-                    	finalH = (int)(collider.width / texRatio);
-                	}
-            	} else { // ScaleMode::Fill
-                	if (colRatio > texRatio) {
-                    	finalW = (int)collider.width;
-                    	finalH = (int)(collider.width / texRatio);
-                	} else {
-                    	finalH = (int)collider.height;
-                    	finalW = (int)(collider.height * texRatio);
-                	}
-            	}
-
-            	renderRect.x = (int)(collider.x + (collider.width - finalW) / 2);
-            	renderRect.y = (int)(collider.y + (collider.height - finalH) / 2);
-            	renderRect.w = finalW;
-            	renderRect.h = finalH;
-        	}
-
-        SDL_RenderCopyEx(renderer, texture, NULL, &renderRect, collider.angleDegrees, NULL, SDL_FLIP_NONE);
+        if (scaleMode == ScaleMode::Repeat) {
+            SDL_Rect clip = { (int)collider.x, (int)collider.y, (int)collider.width, (int)collider.height };
+            SDL_Rect oldClip;
+            SDL_bool hasClip = SDL_RenderIsClipEnabled(renderer);
+            if (hasClip) SDL_RenderGetClipRect(renderer, &oldClip);
+            
+            SDL_RenderSetClipRect(renderer, &clip);
+            for (int y = 0; y < (int)collider.height; y += texH) {
+                for (int x = 0; x < (int)collider.width; x += texW) {
+                    SDL_Rect dest = { (int)collider.x + x, (int)collider.y + y, texW, texH };
+                    SDL_RenderCopyEx(renderer, texture, NULL, &dest, collider.angleDegrees, NULL, SDL_FLIP_NONE);
+                }
+            }
+            SDL_RenderSetClipRect(renderer, hasClip ? &oldClip : NULL);
+        } else {
+            SDL_Rect dest = { (int)collider.x, (int)collider.y, (int)collider.width, (int)collider.height };
+            SDL_RenderCopyEx(renderer, texture, NULL, &dest, collider.angleDegrees, NULL, SDL_FLIP_NONE);
+        }
     }
-}
-    
-    
-	
-	void updatePosition(const std::vector<GameObject*>& otherObjects) {
-    	collider.x += velocityX;
-    	collider.y += velocityY;
 
-    	for (int i = 0; i < 2; i++) {
-        	for (const auto& other : otherObjects) {
-            	if (other == this) continue;
+private:
+    void resolveCollisions(const std::vector<GameObject*>& otherObjects, bool isXAxis) {
+        for (const auto& other : otherObjects) {
+            if (other == this) continue;
 
-            	CollisionResult res = collider.getCollisionData(other->collider);
-            	if (res.collided) {
-                	collider.x += res.normal.x * res.depth;
-                	collider.y += res.normal.y * res.depth;
+            CollisionResult res = collider.getCollisionData(other->collider);
+            if (res.collided) {
+                collider.x += res.normal.x * res.depth;
+                collider.y += res.normal.y * res.depth;
 
-                	float dot = velocityX * res.normal.x + velocityY * res.normal.y;
-                	if (dot < 0) {
-                    	velocityX -= res.normal.x * dot;
-                    	velocityY -= res.normal.y * dot;
-                	}
-            	}
-        	}
-    	}
-	}
-
+                if (isXAxis) velocity.x = 0;
+                else velocity.y = 0;
+            }
+        }
+    }
 };
+
 
 bool Engine_Delay(int time, int& Prev_Tick);
 int Engine_Random(int upper, int lower);

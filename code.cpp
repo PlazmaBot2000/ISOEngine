@@ -29,6 +29,8 @@ int start(SDL_Window *window, SDL_Renderer *renderer){
 		return 1;
 	}
 	
+	player.physicsType = PhysicsType::Static;
+	box.physicsType = PhysicsType::Static;
 	box.collider.x = box.collider.y = 500;
 	box.collider.width *= 2;
 	box.collider.height *= 2;
@@ -43,15 +45,18 @@ int loop(SDL_Window *window, SDL_Renderer *renderer){
     Vector2D Movement = { (double)Engine_GetAxis::X(), (double)Engine_GetAxis::Y() };
     
     double length = Movement.magnitude();
-	player.collider.angleDegrees += 1;
+	if (player.physicsType == PhysicsType::Dynamic) {
+		if (length > 0) {
+        	player.applyForce({(Movement.x / length), (Movement.y / length)});
+		}
+	} else if (player.physicsType == PhysicsType::Kinematic) {
+	    if (length > 0) {
+			player.velocity = {(Movement.x / length) * MOVEMENT_MULT, (Movement.y / length) * MOVEMENT_MULT};
+    	} else {
+			player.velocity = {0, 0};    
+		}
+	}
 
-    if (length > 0) {
-        player.velocityX = (Movement.x / length) * MOVEMENT_MULT;
-        player.velocityY = (Movement.y / length) * MOVEMENT_MULT;
-    } else {
-        player.velocityX = 0;
-        player.velocityY = 0;
-    }
 
     player.updatePosition(Scene);
     Draw(window, renderer);
