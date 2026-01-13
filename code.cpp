@@ -44,6 +44,8 @@ int start(SDL_Window *window, SDL_Renderer *renderer){
 
 int loop(SDL_Window *window, SDL_Renderer *renderer){
     Movement = Engine_GetAxis::All();
+	box.collider.angleDegrees += 1;
+	player.collider.angleDegrees += 1;
 	if(LOG){
 		std::cout << "Movement input: \n" << Movement.x << " "<< Movement.y << std::endl
 			<< "Time: \n" << SDL_GetTicks() << std::endl;

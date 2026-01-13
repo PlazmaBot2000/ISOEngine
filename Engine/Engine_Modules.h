@@ -257,27 +257,44 @@ public:
     }
 
     void draw(SDL_Renderer* renderer) const {
-        if (!texture) return;
+    if (!texture) return;
 
-        if (scaleMode == ScaleMode::Repeat) {
-            SDL_Rect clip = { (int)collider.x, (int)collider.y, (int)collider.width, (int)collider.height };
-            SDL_Rect oldClip;
-            SDL_bool hasClip = SDL_RenderIsClipEnabled(renderer);
-            if (hasClip) SDL_RenderGetClipRect(renderer, &oldClip);
-            
-            SDL_RenderSetClipRect(renderer, &clip);
-            for (int y = 0; y < (int)collider.height; y += texH) {
-                for (int x = 0; x < (int)collider.width; x += texW) {
-                    SDL_Rect dest = { (int)collider.x + x, (int)collider.y + y, texW, texH };
-                    SDL_RenderCopyEx(renderer, texture, NULL, &dest, collider.angleDegrees, NULL, SDL_FLIP_NONE);
-                }
+    Uint8 oldR, oldG, oldB, oldA;
+    SDL_GetRenderDrawColor(renderer, &oldR, &oldG, &oldB, &oldA);
+
+    if (scaleMode == ScaleMode::Repeat) {
+        SDL_Texture* target = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, 
+                                              SDL_TEXTUREACCESS_TARGET, (int)collider.width, (int)collider.height);
+        SDL_SetTextureBlendMode(target, SDL_BLENDMODE_BLEND);
+        
+        SDL_Texture* oldTarget = SDL_GetRenderTarget(renderer);
+        SDL_SetRenderTarget(renderer, target);
+        
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0); 
+        SDL_RenderClear(renderer);
+
+        for (int ty = 0; ty < (int)collider.height; ty += texH) {
+            for (int tx = 0; tx < (int)collider.width; tx += texW) {
+                SDL_Rect tileRect = { tx, ty, texW, texH };
+                SDL_RenderCopy(renderer, texture, NULL, &tileRect);
             }
-            SDL_RenderSetClipRect(renderer, hasClip ? &oldClip : NULL);
-        } else {
-            SDL_Rect dest = { (int)collider.x, (int)collider.y, (int)collider.width, (int)collider.height };
-            SDL_RenderCopyEx(renderer, texture, NULL, &dest, collider.angleDegrees, NULL, SDL_FLIP_NONE);
         }
+
+        SDL_SetRenderTarget(renderer, oldTarget);
+        
+        SDL_Rect dest = { (int)collider.x, (int)collider.y, (int)collider.width, (int)collider.height };
+        SDL_RenderCopyEx(renderer, target, NULL, &dest, collider.angleDegrees, NULL, SDL_FLIP_NONE);
+        
+        SDL_DestroyTexture(target);
+    } else {
+        SDL_Rect dest = { (int)collider.x, (int)collider.y, (int)collider.width, (int)collider.height };
+        SDL_RenderCopyEx(renderer, texture, NULL, &dest, collider.angleDegrees, NULL, SDL_FLIP_NONE);
     }
+
+    SDL_SetRenderDrawColor(renderer, oldR, oldG, oldB, oldA);
+}
+
+
 
 private:
     void resolveCollisions(const std::vector<GameObject*>& otherObjects, bool isXAxis) {
