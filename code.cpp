@@ -5,8 +5,10 @@
 #include <vector>
 
 const int MOVEMENT_MULT = 10;
+const bool LOG = false;
 
 GameObject player, box;
+Vector2D Movement;
 
 int WindowWidth, WindowHeight;
 std::vector<GameObject *> Scene;
@@ -29,10 +31,9 @@ int start(SDL_Window *window, SDL_Renderer *renderer){
 		return 1;
 	}
 	
-	player.physicsType = PhysicsType::Static;
-	box.physicsType = PhysicsType::Static;
+	player.Physics.physicsType = PhysicsType::Kinematic;
 	box.collider.x = box.collider.y = 500;
-	box.collider.width *= 2;
+	box.collider.width *= 5;
 	box.collider.height *= 2;
 	box.scaleMode = ScaleMode::Repeat;
 
@@ -42,18 +43,18 @@ int start(SDL_Window *window, SDL_Renderer *renderer){
 
 
 int loop(SDL_Window *window, SDL_Renderer *renderer){
-    Vector2D Movement = { (double)Engine_GetAxis::X(), (double)Engine_GetAxis::Y() };
+    Movement = Engine_GetAxis::All();
+	if(LOG){
+		std::cout << "Movement input: \n" << Movement.x << " "<< Movement.y << std::endl
+			<< "Time: \n" << SDL_GetTicks() << std::endl;
+	}
     
     double length = Movement.magnitude();
-	if (player.physicsType == PhysicsType::Dynamic) {
-		if (length > 0) {
-        	player.applyForce({(Movement.x / length), (Movement.y / length)});
-		}
-	} else if (player.physicsType == PhysicsType::Kinematic) {
+	if (player.Physics.physicsType == PhysicsType::Kinematic) {
 	    if (length > 0) {
-			player.velocity = {(Movement.x / length) * MOVEMENT_MULT, (Movement.y / length) * MOVEMENT_MULT};
+			player.Physics.velocity = {(Movement.x / length) * MOVEMENT_MULT, (Movement.y / length) * MOVEMENT_MULT};
     	} else {
-			player.velocity = {0, 0};    
+			player.Physics.velocity = {0, 0};    
 		}
 	}
 

@@ -8,12 +8,7 @@
 #ifndef MODULES_H
 #define MODULES_H
 
-class Engine_GetAxis{
-	public:
-		static int X();
-		static int Y();
-};
-
+//=======================================Vector2D========================================
 class Vector2D {
 	public:
     	double x, y;
@@ -28,6 +23,15 @@ class Vector2D {
     	}
 };
 
+//=========================================Input=========================================
+class Engine_GetAxis{
+	public:
+		static int X();
+		static int Y();
+		static Vector2D All();
+};
+
+//=======================================Colliders=======================================
 struct CollisionResult {
     bool collided = false;
     Vector2D normal = {0, 0};
@@ -176,7 +180,7 @@ private:
     }
 };
 
-
+//=======================================GameObject======================================
 enum class ScaleMode {
     Stretch,   // Растянуть (игнорируя пропорции)
     Fit,       // Вписать (с сохранением пропорций, могут быть пустые поля)
@@ -191,17 +195,25 @@ enum class PhysicsType {
 	Dynamic		// На объект действую внешние физические силы
 };
 
-class GameObject {
+class PhysicsClass{
 public:
-    Collider collider;
-    
-    PhysicsType physicsType = PhysicsType::Static;
+	PhysicsType physicsType = PhysicsType::Static;
     Vector2D velocity = {0, 0};
     Vector2D acceleration = {0, 0};
     float mass = 1.0f;
     float friction = 0.95f;
     float gravityScale = 1.0f;
+};
+
+class GameObject {
+public:
+    Collider collider;
     
+	PhysicsClass Physics;
+
+	double x, y;
+	double height, width;
+        
     SDL_Texture* texture = nullptr;
     int texW = 0, texH = 0;
     ScaleMode scaleMode = ScaleMode::Stretch;
@@ -210,37 +222,37 @@ public:
         texture = IMG_LoadTexture(renderer, filePath);
         if (texture) {
             SDL_QueryTexture(texture, NULL, NULL, &texW, &texH);
-            collider.width = (float)texW;
-            collider.height = (float)texH;
+            width = collider.width = (float)texW;
+            height = collider.height = (float)texH;
         }
     }
 
     void applyForce(Vector2D force) {
-        if (physicsType == PhysicsType::Dynamic && mass > 0) {
-            acceleration.x += force.x / mass;
-            acceleration.y += force.y / mass;
+        if (Physics.physicsType == PhysicsType::Dynamic && Physics.mass > 0) {
+            Physics.acceleration.x += force.x / Physics.mass;
+            Physics.acceleration.y += force.y / Physics.mass;
         }
     }
 
     void updatePosition(const std::vector<GameObject*>& otherObjects) {
-        if (physicsType == PhysicsType::Static) return;
+        if (Physics.physicsType == PhysicsType::Static) return;
 
-        if (physicsType == PhysicsType::Dynamic) {
-            applyForce({0, 0.5f * gravityScale});
+        if (Physics.physicsType == PhysicsType::Dynamic) {
+            applyForce({0, 0.5f * Physics.gravityScale});
 
-            velocity.x += acceleration.x;
-            velocity.y += acceleration.y;
+            Physics.velocity.x += Physics.acceleration.x;
+            Physics.velocity.y += Physics.acceleration.y;
             
-            velocity.x *= friction;
-            velocity.y *= friction;
+            Physics.velocity.x *= Physics.friction;
+            Physics.velocity.y *= Physics.friction;
 
-            acceleration = {0, 0};
+            Physics.acceleration = {0, 0};
         }
 
-        collider.x += velocity.x;
+        collider.x += Physics.velocity.x;
         resolveCollisions(otherObjects, true);
 
-        collider.y += velocity.y;
+        collider.y += Physics.velocity.y;
         resolveCollisions(otherObjects, false);
     }
 
@@ -277,8 +289,8 @@ private:
                 collider.x += res.normal.x * res.depth;
                 collider.y += res.normal.y * res.depth;
 
-                if (isXAxis) velocity.x = 0;
-                else velocity.y = 0;
+                if (isXAxis) Physics.velocity.x = 0;
+                else Physics.velocity.y = 0;
             }
         }
     }

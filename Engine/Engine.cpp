@@ -5,9 +5,9 @@
 
 toml::table Engine_Config;
 
-int main() {
+int main(int argc, char* argv[]) {
 	try {
-        Engine_Config = toml::parse_file("/home/plazma/Coding/C++/ISOEngine/Engine/Engine_Config.toml");
+        Engine_Config = toml::parse_file("Assets/Engine_Config.toml");
     } catch (const toml::parse_error& err) {
         std::cerr << "Error parsing file: " << err.description() << std::endl;
         std::cerr << "  Occurred at: " << err.source() << std::endl;
@@ -28,11 +28,19 @@ int main() {
     SDL_Window   *window   = nullptr;
     SDL_Renderer *renderer = nullptr;
 	
-    if (SDL_CreateWindowAndRenderer(WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_SHOWN | SDL_WINDOW_INPUT_FOCUS | SDL_WINDOW_FULLSCREEN, &window, &renderer)) {
+    if (SDL_CreateWindowAndRenderer(WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_SHOWN | SDL_WINDOW_INPUT_FOCUS, &window, &renderer)) {
         std::cerr << "Failed to create window and renderer: " << SDL_GetError() << std::endl;
         return -1;
     }
-	
+
+	SDL_RenderSetVSync(renderer, Engine_Config["VSYNC"].value_or(0));
+    
+    if(Engine_Config["FULLSCREEN"].value_or("WINDOWED") == "BORDERLESS"){
+        SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+    }else if(Engine_Config["FULLSCREEN"].value_or("WINDOWED") == "FULLSCREEN"){
+        SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN);
+    }
+
 	SDL_SetWindowTitle(window, "Engine");
 	SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
 
