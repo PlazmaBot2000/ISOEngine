@@ -9,7 +9,12 @@ It will be isometric game engine based on SDL2.
 - algorithm
 - iostream
 
-# How to compile on linux:
+# How to build on linux:
 ```
-g++ *.cpp Engine/*.cpp -L. -lSDL2 -lSDL2main -lSDL2_image
+sudo chmod +x build.sh
+./build.sh
+```
+# How to build on windows with msys2
+```
+./build.ps
 ```
