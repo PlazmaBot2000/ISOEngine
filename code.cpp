@@ -10,59 +10,84 @@ const bool LOG = false;
 GameObject player, box;
 Vector2D Movement;
 
-int WindowWidth, WindowHeight;
+int WindowWidth, WindowHeight = 0;
 std::vector<GameObject *> Scene;
+
+CinematicCamera camera;
 
 
 void Draw(SDL_Window *window, SDL_Renderer *renderer){
-	player.draw(renderer);
-	box.draw(renderer);
+	player.texture.draw(renderer, camera.x, camera.y);
+	box.texture.draw(renderer, camera.x, camera.y);
 }
 
 
 int start(SDL_Window *window, SDL_Renderer *renderer){	
 	SDL_SetRenderDrawColor(renderer, 34, 32, 52, 255);
 	SDL_GetWindowSize(window, &WindowWidth, &WindowHeight);
-	player.loadTexture(renderer, "Assets/player.png");
-	box.loadTexture(renderer, "Assets/box.png");
-	
-	if(!player.texture or !box.texture){
+
+	player.texture.loadTexture(renderer, "Assets/Textures/player.png");
+	box.texture.loadTexture(renderer, "Assets/Textures/box.png");
+
+	if(!player.texture.texture or !box.texture.texture){
 		std::cerr << "Ошибка загрузки текстур: " << IMG_GetError() << std::endl;
 		return 1;
 	}
-	
-	player.Physics.physicsType = PhysicsType::Kinematic;
-	box.collider.x = box.collider.y = 500;
-	box.collider.width *= 5;
-	box.collider.height *= 2;
-	box.scaleMode = ScaleMode::Repeat;
+	 
+    player.x = 100; player.y = 100;
+    player.width = player.texture.width;
+    player.height = player.texture.height;
+    player.physics.type = PhysicsType::Kinematic;
+    player.addCollider(static_cast<float>(player.width), static_cast<float>(player.height), static_cast<float>(player.angle));
+	camera.Target = &player;
+	camera.x = player.x + (player.width - WindowWidth) / 2.0f;
+	camera.y = player.y + (player.height - WindowHeight) / 2.0f;
 
-	Scene.push_back(&box);
-	return 0;
+    box.x = 400; box.y = 400;
+    box.width = box.texture.width * 5.0f;
+    box.height = box.texture.height * 2.0f;
+    box.texture.scaleMode = ScaleMode::Repeat;
+    box.physics.type = PhysicsType::Static;
+    box.addCollider(static_cast<float>(box.width), static_cast<float>(box.height), static_cast<float>(box.angle));
+
+    Scene.push_back(&box);
+    return 0;
 }
 
 
 int loop(SDL_Window *window, SDL_Renderer *renderer){
     Movement = Engine_GetAxis::All();
-	box.collider.angleDegrees += 1;
-	player.collider.angleDegrees += 1;
+    
+    SDL_Event event;
+    while (SDL_PollEvent(&event) != 0) {
+        if (event.type == SDL_QUIT) return 1;
+
+        if (event.type == SDL_KEYDOWN) {
+            if (event.key.keysym.sym == SDLK_ESCAPE) {
+                return 1;
+            }
+        }
+    }
+
+    Movement = Engine_GetAxis::All();
+    
+    double mag = Movement.magnitude();
+    if (mag > 0.001) {
+        player.physics.velocity.x = (Movement.x / mag) * MOVEMENT_MULT;
+        player.physics.velocity.y = (Movement.y / mag) * MOVEMENT_MULT;
+    } else {
+        player.physics.velocity = {0, 0};
+    }
+    
+    box.update({});
+	player.update(Scene);
+	camera.update(window, Movement);
+	
 	if(LOG){
 		std::cout << "Movement input: \n" << Movement.x << " "<< Movement.y << std::endl
 			<< "Time: \n" << SDL_GetTicks() << std::endl;
 	}
-    
-    double length = Movement.magnitude();
-	if (player.Physics.physicsType == PhysicsType::Kinematic) {
-	    if (length > 0) {
-			player.Physics.velocity = {(Movement.x / length) * MOVEMENT_MULT, (Movement.y / length) * MOVEMENT_MULT};
-    	} else {
-			player.Physics.velocity = {0, 0};    
-		}
-	}
 
-
-    player.updatePosition(Scene);
     Draw(window, renderer);
-
     return 0;
 }

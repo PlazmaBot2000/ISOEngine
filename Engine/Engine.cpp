@@ -1,3 +1,8 @@
+#ifdef _WIN32
+    #define WIN32_LEAN_AND_MEAN
+    #include <windows.h>
+#endif
+
 #include <SDL2/SDL.h>
 #include <iostream>
 #include <toml++/toml.hpp>
@@ -6,8 +11,19 @@
 toml::table Engine_Config;
 
 int main(int argc, char* argv[]) {
+    
+    #ifdef _WIN32
+        SetConsoleCP(65001);
+        SetConsoleOutputCP(65001);
+        setvbuf(stdout, nullptr, _IOFBF, 1000); 
+		SetProcessDPIAware();
+    #endif
+
+    std::setlocale(LC_ALL, ".UTF8");
+
+
 	try {
-        Engine_Config = toml::parse_file("Assets/Engine_Config.toml");
+        Engine_Config = toml::parse_file("Assets/Config/Engine_Config.toml");
     } catch (const toml::parse_error& err) {
         std::cerr << "Error parsing file: " << err.description() << std::endl;
         std::cerr << "  Occurred at: " << err.source() << std::endl;
@@ -35,9 +51,9 @@ int main(int argc, char* argv[]) {
 
 	SDL_RenderSetVSync(renderer, Engine_Config["VSYNC"].value_or(0));
     
-    if(Engine_Config["FULLSCREEN"].value_or("WINDOWED") == "BORDERLESS"){
+    if(std::string(Engine_Config["FULLSCREEN"].value_or("WINDOWED")) == "BORDERLESS") {
         SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
-    }else if(Engine_Config["FULLSCREEN"].value_or("WINDOWED") == "FULLSCREEN"){
+    }else if(std::string(Engine_Config["FULLSCREEN"].value_or("WINDOWED")) == "FULLSCREEN") {
         SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN);
     }
 
@@ -47,23 +63,19 @@ int main(int argc, char* argv[]) {
 	bool game_is_running = true;
 	if(start(window, renderer) != 0) game_is_running = false;
 
-    while (game_is_running) { // main game loop
-		Uint32 frameStart = SDL_GetTicks();
+    while (game_is_running) {
+        Uint32 frameStart = SDL_GetTicks();
 
-		SDL_Event event; // handle window closing
-		while (SDL_PollEvent(&event) != 0) {
-			if (SDL_QUIT==event.type || (SDL_KEYDOWN==event.type && SDLK_ESCAPE==event.key.keysym.sym))
-				game_is_running = false; // quit
-		}
-		SDL_RenderClear(renderer); // re-draw the window
+        SDL_RenderClear(renderer);
 
-		if(loop(window, renderer) != 0){
-			game_is_running = false;
-		}
+        if (loop(window, renderer) != 0) {
+            game_is_running = false;
+        }
+
         SDL_RenderPresent(renderer);
 
-		int frameTime = SDL_GetTicks() - frameStart;
-		if (FRAME_DELAY_MS > frameTime) {
+        int frameTime = SDL_GetTicks() - frameStart;
+        if (FRAME_DELAY_MS > frameTime) {
             SDL_Delay(FRAME_DELAY_MS - frameTime);
         }
     }

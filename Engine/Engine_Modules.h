@@ -8,45 +8,59 @@
 #ifndef MODULES_H
 #define MODULES_H
 
+
 //=======================================Vector2D========================================
 class Vector2D {
-	public:
-    	double x, y;
-    	Vector2D operator+(const Vector2D& other) const { return {x + other.x, y + other.y}; }
-    	Vector2D operator-(const Vector2D& other) const { return {x - other.x, y - other.y}; }
-		Vector2D operator*(double scalar) const { return {x * scalar, y * scalar}; }
-    	double magnitude() const { return std::sqrt(x * x + y * y); }
+public:
+    double x, y;
+    Vector2D operator+(const Vector2D& other) const { return {x + other.x, y + other.y}; }
+    Vector2D operator-(const Vector2D& other) const { return {x - other.x, y - other.y}; }
+    Vector2D operator*(double scalar) const { return {x * scalar, y * scalar}; }
+    double magnitude() const { return std::sqrt(x * x + y * y); }
 
-		float getAngleDegrees() const {
-        	float radians = std::atan2(y, x);
-        	return radians * (180.0f / 3.14159265f);
-    	}
+    float getangle() const {
+        float radians = std::atan2(y, x);
+        return radians * (180.0f / 3.14159265f);
+    }
 };
+
 
 //=========================================Input=========================================
 class Engine_GetAxis{
-	public:
-		static int X();
-		static int Y();
-		static Vector2D All();
+public:
+    static int Y(){
+		const Uint8 *keyState = SDL_GetKeyboardState(NULL);
+		return std::max(-1, std::min((keyState[SDL_SCANCODE_S] - keyState[SDL_SCANCODE_W] + keyState[SDL_SCANCODE_DOWN] - keyState[SDL_SCANCODE_UP]), 1));
+	}
+
+	static int X(){
+		const Uint8 *keyState = SDL_GetKeyboardState(NULL);
+		return std::max(-1, std::min((keyState[SDL_SCANCODE_D] - keyState[SDL_SCANCODE_A] + keyState[SDL_SCANCODE_RIGHT] - keyState[SDL_SCANCODE_LEFT]), 1));
+	}
+
+	static Vector2D All(){
+		const Uint8 *keyState = SDL_GetKeyboardState(NULL);
+		return { (double)std::max(-1, std::min((keyState[SDL_SCANCODE_D] - keyState[SDL_SCANCODE_A] + keyState[SDL_SCANCODE_RIGHT] - keyState[SDL_SCANCODE_LEFT]), 1)), (double)std::max(-1, std::min((keyState[SDL_SCANCODE_S] - keyState[SDL_SCANCODE_W] + keyState[SDL_SCANCODE_DOWN] - keyState[SDL_SCANCODE_UP]), 1)) };
+	}
+
 };
+
 
 //=======================================Colliders=======================================
-struct CollisionResult {
-    bool collided = false;
-    Vector2D normal = {0, 0};
-    float depth = 0;
-};
-
 class Collider {
 public:
+    struct CollisionResult {
+        bool collided = false;
+        Vector2D normal = {0, 0};
+        float depth = 0;
+    };
     float x, y;
     float width, height;
     
-    float angleDegrees = 0.0f; 
+    float angle = 0.0f; 
 
     bool checkCollision(const Collider& b) const {
-        if (angleDegrees == 0.0f && b.angleDegrees == 0.0f) {
+        if (angle == 0.0f && b.angle == 0.0f) {
             return (x < b.x + b.width &&
                     x + width > b.x &&
                     y < b.y + b.height &&
@@ -133,7 +147,7 @@ private:
         float cx = x + width / 2.0f;
         float cy = y + height / 2.0f;
         
-        float angleRad = angleDegrees * DEG_TO_RAD;
+        float angleRad = angle * DEG_TO_RAD;
         float cosA = cosf(angleRad);
         float sinA = sinf(angleRad);
 
@@ -178,138 +192,231 @@ private:
 
         return checkAxis(v1, v2) && checkAxis(v2, v1);
     }
-};
+};  
 
-//=======================================GameObject======================================
+
+//========================================Texture========================================
 enum class ScaleMode {
-    Stretch,   // Растянуть (игнорируя пропорции)
-    Fit,       // Вписать (с сохранением пропорций, могут быть пустые поля)
-    Fill,      // Заполнить (с сохранением пропорций, часть картинки может выйти за границы)
-	Repeat     // Замощение (с повторением изображения)
+    Stretch,   // Растянуть
+    Fit,       // Вписать (черные полосы)
+    Fill,      // Заполнить (обрезание краев)
+    Repeat     // Замощение
 };
 
 
-enum class PhysicsType {
-	Static,		// Объект недвижим
-	Kinematic,	// Объект можно двигать но он не падает
-	Dynamic		// На объект действую внешние физические силы
-};
-
-class PhysicsClass{
+class Texture {
 public:
-	PhysicsType physicsType = PhysicsType::Static;
-    Vector2D velocity = {0, 0};
-    Vector2D acceleration = {0, 0};
-    float mass = 1.0f;
-    float friction = 0.95f;
-    float gravityScale = 1.0f;
-};
-
-class GameObject {
-public:
-    Collider collider;
+    int x, y, width, height, offsetX, offsetY = 0;
+    float angle = 0.0;
     
-	PhysicsClass Physics;
-
-	double x, y;
-	double height, width;
-        
     SDL_Texture* texture = nullptr;
-    int texW = 0, texH = 0;
+    int texW = 0;
+    int texH = 0;
+
     ScaleMode scaleMode = ScaleMode::Stretch;
 
+
+    Texture() {}
+
+
     void loadTexture(SDL_Renderer* renderer, const char* filePath) {
+        if (texture) SDL_DestroyTexture(texture);
         texture = IMG_LoadTexture(renderer, filePath);
         if (texture) {
             SDL_QueryTexture(texture, NULL, NULL, &texW, &texH);
-            width = collider.width = (float)texW;
-            height = collider.height = (float)texH;
+            if (width == 0) width = (float)texW;
+            if (height == 0) height = (float)texH;
         }
     }
 
-    void applyForce(Vector2D force) {
-        if (Physics.physicsType == PhysicsType::Dynamic && Physics.mass > 0) {
-            Physics.acceleration.x += force.x / Physics.mass;
-            Physics.acceleration.y += force.y / Physics.mass;
-        }
+    ~Texture() {
+        if (texture) SDL_DestroyTexture(texture);
     }
 
-    void updatePosition(const std::vector<GameObject*>& otherObjects) {
-        if (Physics.physicsType == PhysicsType::Static) return;
+	void draw(SDL_Renderer* renderer, int camX = 0, int camY = 0) const {
+	    if (!texture) return;
+	
+	    Uint8 oldR, oldG, oldB, oldA;
+	    SDL_GetRenderDrawColor(renderer, &oldR, &oldG, &oldB, &oldA);
+	
+	    if (scaleMode == ScaleMode::Repeat) {
+	        SDL_Texture* target = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, 
+	                                            SDL_TEXTUREACCESS_TARGET, width, height);
+	        SDL_SetTextureBlendMode(target, SDL_BLENDMODE_BLEND);
+	        
+	        SDL_Texture* oldTarget = SDL_GetRenderTarget(renderer);
+	        SDL_SetRenderTarget(renderer, target);
+	        
+	        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0); 
+	        SDL_RenderClear(renderer);
+	
+	        for (int ty = 0; ty < height; ty += texH) {
+	            for (int tx = 0; tx < width; tx += texW) {
+	                SDL_Rect tileRect = { tx, ty, texW, texH };
+	                SDL_RenderCopy(renderer, texture, NULL, &tileRect);
+	            }
+	        }
+	
+	        SDL_SetRenderTarget(renderer, oldTarget);
+	        
+	        SDL_Rect dest = { x + offsetX - camX, y + offsetY - camY, width, height };
+	        SDL_RenderCopyEx(renderer, target, NULL, &dest, angle, NULL, SDL_FLIP_NONE);
+	        
+	        SDL_DestroyTexture(target);
+	    } else {
+	        SDL_Rect dest = { x - camX, y - camY, width, height };
+	        SDL_RenderCopyEx(renderer, texture, NULL, &dest, angle, NULL, SDL_FLIP_NONE);
+	    }
+	
+	    SDL_SetRenderDrawColor(renderer, oldR, oldG, oldB, oldA);
+	}
 
-        if (Physics.physicsType == PhysicsType::Dynamic) {
-            applyForce({0, 0.5f * Physics.gravityScale});
 
-            Physics.velocity.x += Physics.acceleration.x;
-            Physics.velocity.y += Physics.acceleration.y;
-            
-            Physics.velocity.x *= Physics.friction;
-            Physics.velocity.y *= Physics.friction;
-
-            Physics.acceleration = {0, 0};
-        }
-
-        collider.x += Physics.velocity.x;
-        resolveCollisions(otherObjects, true);
-
-        collider.y += Physics.velocity.y;
-        resolveCollisions(otherObjects, false);
-    }
-
-    void draw(SDL_Renderer* renderer) const {
-    if (!texture) return;
-
-    Uint8 oldR, oldG, oldB, oldA;
-    SDL_GetRenderDrawColor(renderer, &oldR, &oldG, &oldB, &oldA);
-
-    if (scaleMode == ScaleMode::Repeat) {
-        SDL_Texture* target = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, 
-                                              SDL_TEXTUREACCESS_TARGET, (int)collider.width, (int)collider.height);
-        SDL_SetTextureBlendMode(target, SDL_BLENDMODE_BLEND);
+private:
+    void drawRepeat(SDL_Renderer* renderer, float drawX, float drawY) const {
+        SDL_Texture* target = SDL_CreateTexture(renderer, 
+            SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, (int)width, (int)height);
         
+        if (!target) return;
+
+        SDL_SetTextureBlendMode(target, SDL_BLENDMODE_BLEND);
+
         SDL_Texture* oldTarget = SDL_GetRenderTarget(renderer);
         SDL_SetRenderTarget(renderer, target);
-        
+
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0); 
         SDL_RenderClear(renderer);
 
-        for (int ty = 0; ty < (int)collider.height; ty += texH) {
-            for (int tx = 0; tx < (int)collider.width; tx += texW) {
-                SDL_Rect tileRect = { tx, ty, texW, texH };
-                SDL_RenderCopy(renderer, texture, NULL, &tileRect);
+        for (int ty = 0; ty < (int)height; ty += texH) {
+            for (int tx = 0; tx < (int)width; tx += texW) {
+                SDL_Rect tileRect = { tx, ty, texH, texW };
+                
+                SDL_Rect srcRect = { 0, 0, texW, texH };
+                if (tx + texW > (int)width) { tileRect.w = (int)width - tx; srcRect.w = tileRect.w; }
+                if (ty + texH > (int)height) { tileRect.h = (int)height - ty; srcRect.h = tileRect.h; }
+
+                SDL_RenderCopy(renderer, texture, &srcRect, &tileRect);
             }
         }
 
         SDL_SetRenderTarget(renderer, oldTarget);
-        
-        SDL_Rect dest = { (int)collider.x, (int)collider.y, (int)collider.width, (int)collider.height };
-        SDL_RenderCopyEx(renderer, target, NULL, &dest, collider.angleDegrees, NULL, SDL_FLIP_NONE);
-        
+
+        SDL_Rect finalDest = { (int)drawX, (int)drawY, (int)width, (int)height };
+        SDL_RenderCopyEx(renderer, target, NULL, &finalDest, (double)angle, NULL, SDL_FLIP_NONE);
+
         SDL_DestroyTexture(target);
-    } else {
-        SDL_Rect dest = { (int)collider.x, (int)collider.y, (int)collider.width, (int)collider.height };
-        SDL_RenderCopyEx(renderer, texture, NULL, &dest, collider.angleDegrees, NULL, SDL_FLIP_NONE);
+    }
+};
+
+//========================================Physics========================================
+class GameObject;
+
+
+enum class PhysicsType {
+    Static,
+    Kinematic,
+    Dynamic
+};
+
+
+class PhysicsBody {
+public:
+    double x, y;
+    double width, height;
+    double angle;
+    GameObject* parent;
+    PhysicsType type = PhysicsType::Static;
+    Vector2D velocity = {0.0f, 0.0f};
+    Vector2D acceleration = {0.0f, 0.0f};
+    float mass = 1.0f;
+    float friction = 0.95f;
+    float gravityScale = 1.0f;
+
+    PhysicsBody(GameObject* p) : parent(p), x(0), y(0), width(0), height(0), angle(0) {}
+
+    void applyForce(Vector2D force) {
+        if (type == PhysicsType::Dynamic && mass > 0) {
+            acceleration.x += force.x / mass;
+            acceleration.y += force.y / mass;
+        }
     }
 
-    SDL_SetRenderDrawColor(renderer, oldR, oldG, oldB, oldA);
-}
-
-
+    void update(const std::vector<GameObject*>& otherObjects);
 
 private:
-    void resolveCollisions(const std::vector<GameObject*>& otherObjects, bool isXAxis) {
-        for (const auto& other : otherObjects) {
-            if (other == this) continue;
+    void syncParentAndColliders();
 
-            CollisionResult res = collider.getCollisionData(other->collider);
-            if (res.collided) {
-                collider.x += res.normal.x * res.depth;
-                collider.y += res.normal.y * res.depth;
+    bool resolveCollisions(const std::vector<GameObject*>& otherObjects); 
+};
 
-                if (isXAxis) Physics.velocity.x = 0;
-                else Physics.velocity.y = 0;
-            }
-        }
+
+//=======================================GameObject=======================================
+class GameObject {
+public:
+    std::vector<Collider> colliderArray;
+    PhysicsBody physics; 
+    Texture texture;
+
+    double x, y;
+    double width, height;
+    double angle;
+
+    GameObject(float startX, float startY, float startW, float startH, float startAngle = 0.0f) 
+    	: x(startX), y(startY), width(startW), height(startH), angle(startAngle), 
+			physics(this)
+	{
+		physics.x = startX;
+		physics.y = startY;
+		physics.width = startW;
+		physics.height = startH;
+		physics.angle = startAngle;
+	}
+
+    GameObject() 
+        : x(0), y(0), width(0), height(0), angle(0), 
+          physics(this)
+    {}
+
+    void update(const std::vector<GameObject*>& otherObjects) {
+        physics.update(otherObjects);
+		texture.x = (int)x;    texture.x = (int)x;
+    texture.y = (int)y;
+    texture.width = (int)width;
+    texture.height = (int)height;
+    texture.angle = (float)angle;
+    	texture.y = (int)y;
+    	texture.angle = (float)angle;
+    }
+
+    void addCollider(float w, float h, float a) {
+        Collider col;
+        col.width = w;
+        col.height = h;
+		col.angle = a;
+        colliderArray.push_back(col);
+    }
+};
+
+
+
+//========================================Camera=========================================
+class CinematicCamera {
+public:
+	GameObject * Target;
+    float x = 0, y = 0;
+    float lerpSpeed = 0.05f;
+    float lookAhead = 50.0f;
+
+    void update(SDL_Window *window, Vector2D Velocity = {0, 0}) {
+        Vector2D Movement = Engine_GetAxis::All();
+		int WindowWidth, WindowHeight;
+		SDL_GetWindowSize(window, &WindowWidth, &WindowHeight);
+
+        float targetX = Target->x + (Target->width - WindowWidth / 2.0f) + (Velocity.x * lookAhead);
+        float targetY = Target->y + (Target->height - WindowHeight / 2.0f) + (Velocity.y * lookAhead);
+
+        x += (targetX - x) * lerpSpeed;
+        y += (targetY - y) * lerpSpeed;
     }
 };
 
