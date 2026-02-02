@@ -8,19 +8,25 @@ const int MOVEMENT_MULT = 10;
 const bool LOG = false;
 
 GameObject player, box;
+Mouse mouse;
 Vector2D Movement;
+
+bool big = false;
 
 int WindowWidth, WindowHeight = 0;
 std::vector<GameObject *> Scene;
 
 CinematicCamera camera;
 
-
 void Draw(SDL_Window *window, SDL_Renderer *renderer){
 	player.texture.draw(renderer, camera.x, camera.y);
 	box.texture.draw(renderer, camera.x, camera.y);
+	mouse.draw(renderer, camera.x, camera.y);
+	
+	if (!player.colliderArray.empty()) {
+		player.colliderArray[0].draw(renderer, camera.x, camera.y);
+	}
 }
-
 
 int start(SDL_Window *window, SDL_Renderer *renderer){	
 	SDL_SetRenderDrawColor(renderer, 34, 32, 52, 255);
@@ -34,11 +40,12 @@ int start(SDL_Window *window, SDL_Renderer *renderer){
 		return 1;
 	}
 	 
-    player.x = 100; player.y = 100;
-    player.width = player.texture.width;
-    player.height = player.texture.height;
+    player.x = 100; player.y = 100;	
+    player.width = 64;
+    player.height = 64;
     player.physics.type = PhysicsType::Kinematic;
-    player.addCollider(static_cast<float>(player.width), static_cast<float>(player.height), static_cast<float>(player.angle));
+    player.addCollider(player.width, player.height, player.angle);
+	
 	camera.Target = &player;
 	camera.x = player.x + (player.width - WindowWidth) / 2.0f;
 	camera.y = player.y + (player.height - WindowHeight) / 2.0f;
@@ -48,26 +55,41 @@ int start(SDL_Window *window, SDL_Renderer *renderer){
     box.height = box.texture.height * 2.0f;
     box.texture.scaleMode = ScaleMode::Repeat;
     box.physics.type = PhysicsType::Static;
-    box.addCollider(static_cast<float>(box.width), static_cast<float>(box.height), static_cast<float>(box.angle));
+    box.addCollider(box.width, box.height, box.angle);
 
     Scene.push_back(&box);
     return 0;
 }
 
-
 int loop(SDL_Window *window, SDL_Renderer *renderer){
-    Movement = Engine_GetAxis::All();
-    
+    mouse.update(camera.x, camera.y);
+
     SDL_Event event;
     while (SDL_PollEvent(&event) != 0) {
         if (event.type == SDL_QUIT) return 1;
+        if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE) return 1;
+    }
 
-        if (event.type == SDL_KEYDOWN) {
-            if (event.key.keysym.sym == SDLK_ESCAPE) {
-                return 1;
-            }
+    if (player.colliderArray[0].contains(mouse.x, mouse.y)) {
+        player.width = player.height = 128;
+        if (!big){
+            player.x -= 32;
+            player.y -= 32;
+            big = true;
+        }
+    } else {
+        player.width = player.height = 64;
+        if (big){
+            player.x += 32;
+            player.y += 32;
+            big = false;
         }
     }
+
+    player.colliderArray[0].width = player.width;
+    player.colliderArray[0].height = player.height;
+    player.colliderArray[0].x = player.x;
+    player.colliderArray[0].y = player.y;
 
     Movement = Engine_GetAxis::All();
     
@@ -82,11 +104,6 @@ int loop(SDL_Window *window, SDL_Renderer *renderer){
     box.update({});
 	player.update(Scene);
 	camera.update(window, Movement);
-	
-	if(LOG){
-		std::cout << "Movement input: \n" << Movement.x << " "<< Movement.y << std::endl
-			<< "Time: \n" << SDL_GetTicks() << std::endl;
-	}
 
     Draw(window, renderer);
     return 0;

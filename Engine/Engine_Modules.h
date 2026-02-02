@@ -25,27 +25,6 @@ public:
 };
 
 
-//=========================================Input=========================================
-class Engine_GetAxis{
-public:
-    static int Y(){
-		const Uint8 *keyState = SDL_GetKeyboardState(NULL);
-		return std::max(-1, std::min((keyState[SDL_SCANCODE_S] - keyState[SDL_SCANCODE_W] + keyState[SDL_SCANCODE_DOWN] - keyState[SDL_SCANCODE_UP]), 1));
-	}
-
-	static int X(){
-		const Uint8 *keyState = SDL_GetKeyboardState(NULL);
-		return std::max(-1, std::min((keyState[SDL_SCANCODE_D] - keyState[SDL_SCANCODE_A] + keyState[SDL_SCANCODE_RIGHT] - keyState[SDL_SCANCODE_LEFT]), 1));
-	}
-
-	static Vector2D All(){
-		const Uint8 *keyState = SDL_GetKeyboardState(NULL);
-		return { (double)std::max(-1, std::min((keyState[SDL_SCANCODE_D] - keyState[SDL_SCANCODE_A] + keyState[SDL_SCANCODE_RIGHT] - keyState[SDL_SCANCODE_LEFT]), 1)), (double)std::max(-1, std::min((keyState[SDL_SCANCODE_S] - keyState[SDL_SCANCODE_W] + keyState[SDL_SCANCODE_DOWN] - keyState[SDL_SCANCODE_UP]), 1)) };
-	}
-
-};
-
-
 //=======================================Colliders=======================================
 class Collider {
 public:
@@ -54,10 +33,15 @@ public:
         Vector2D normal = {0, 0};
         float depth = 0;
     };
+
     float x, y;
     float width, height;
-    
     float angle = 0.0f; 
+
+	Collider() : x(0), y(0), width(0), height(0), angle(0.0f) {}
+
+    Collider(float x, float y, float width, float height, float angle = 0.0f) 
+        : x(x), y(y), width(width), height(height), angle(angle) {}
 
     bool checkCollision(const Collider& b) const {
         if (angle == 0.0f && b.angle == 0.0f) {
@@ -69,7 +53,29 @@ public:
         return checkCollisionSAT(b);
     }
 
-    void draw(SDL_Renderer* renderer) const {
+	bool contains(float px, float py) const {
+    	if (angle == 0.0f) {
+        	return (px >= x && px <= x + width && py >= y && py <= y + height);
+    	}
+
+    	float cx = x + width / 2.0f;
+    	float cy = y + height / 2.0f;
+
+    	float dx = px - cx;
+    	float dy = py - cy;
+
+    	float angleRad = -angle * (3.14159265f / 180.0f);
+    	float cosA = cosf(angleRad);
+    	float sinA = sinf(angleRad);
+
+    	float localX = dx * cosA - dy * sinA;
+    	float localY = dx * sinA + dy * cosA;
+
+    	return (localX >= -width / 2.0f && localX <= width / 2.0f && localY >= -height / 2.0f && localY <= height / 2.0f);
+}
+
+    
+	void draw(SDL_Renderer* renderer, float cameraX = 0, float cameraY = 0) const {
         auto vertices = getVertices();
         Uint8 r, g, b, a;
         SDL_GetRenderDrawColor(renderer, &r, &g, &b, &a);
@@ -78,14 +84,19 @@ public:
         for (int i = 0; i < 4; i++) {
             const Vector2D& p1 = vertices[i];
             const Vector2D& p2 = vertices[(i + 1) % 4];
+            
             SDL_RenderDrawLine(renderer, 
-                static_cast<int>(p1.x), static_cast<int>(p1.y), 
-                static_cast<int>(p2.x), static_cast<int>(p2.y));
+                static_cast<int>(p1.x - cameraX), 
+                static_cast<int>(p1.y - cameraY), 
+                static_cast<int>(p2.x - cameraX), 
+                static_cast<int>(p2.y - cameraY)
+            );
         }
         SDL_SetRenderDrawColor(renderer, r, g, b, a);
     }
 
-		CollisionResult getCollisionData(const Collider& b) const {
+
+	CollisionResult getCollisionData(const Collider& b) const {
     	auto v1 = getVertices();
     	auto v2 = b.getVertices();
     	CollisionResult result;
@@ -193,6 +204,67 @@ private:
         return checkAxis(v1, v2) && checkAxis(v2, v1);
     }
 };  
+
+
+//=========================================Input=========================================
+class Engine_GetAxis{
+public:
+    static int Y(){
+		const Uint8 *keyState = SDL_GetKeyboardState(NULL);
+		return std::max(-1, std::min((keyState[SDL_SCANCODE_S] - keyState[SDL_SCANCODE_W] + keyState[SDL_SCANCODE_DOWN] - keyState[SDL_SCANCODE_UP]), 1));
+	}
+
+	static int X(){
+		const Uint8 *keyState = SDL_GetKeyboardState(NULL);
+		return std::max(-1, std::min((keyState[SDL_SCANCODE_D] - keyState[SDL_SCANCODE_A] + keyState[SDL_SCANCODE_RIGHT] - keyState[SDL_SCANCODE_LEFT]), 1));
+	}
+
+	static Vector2D All(){
+		const Uint8 *keyState = SDL_GetKeyboardState(NULL);
+		return { (double)std::max(-1, std::min((keyState[SDL_SCANCODE_D] - keyState[SDL_SCANCODE_A] + keyState[SDL_SCANCODE_RIGHT] - keyState[SDL_SCANCODE_LEFT]), 1)), (double)std::max(-1, std::min((keyState[SDL_SCANCODE_S] - keyState[SDL_SCANCODE_W] + keyState[SDL_SCANCODE_DOWN] - keyState[SDL_SCANCODE_UP]), 1)) };
+	}
+
+};
+
+
+class Mouse {
+public:
+    float x = 0, y = 0;
+    float screenX = 0, screenY = 0;
+    Collider collider;
+
+    bool leftPressed = false;
+    bool rightPressed = false;
+    bool leftClicked = false;
+
+    Mouse() : collider(0, 0, 2, 2, 0) {}
+
+    void update(float cameraX, float cameraY) {
+        int tx, ty;
+        Uint32 buttons = SDL_GetMouseState(&tx, &ty);
+
+        screenX = static_cast<float>(tx);
+        screenY = static_cast<float>(ty);
+
+        x = screenX + cameraX;
+        y = screenY + cameraY;
+
+        collider.x = x - collider.width / 2.0f;
+        collider.y = y - collider.height / 2.0f;
+
+        bool wasLeftPressed = leftPressed;
+        leftPressed = (buttons & SDL_BUTTON(SDL_BUTTON_LEFT));
+        rightPressed = (buttons & SDL_BUTTON(SDL_BUTTON_RIGHT));
+        
+        leftClicked = leftPressed && !wasLeftPressed;
+    }
+
+    void draw(SDL_Renderer* renderer, float cameraX = 0, float cameraY = 0) const {
+        collider.draw(renderer, cameraX, cameraY);
+    }
+};
+
+
 
 
 //========================================Texture========================================
@@ -357,9 +429,9 @@ public:
     PhysicsBody physics; 
     Texture texture;
 
-    double x, y;
-    double width, height;
-    double angle;
+    double x, y = 0;
+    double width, height = 0;
+    double angle = 0;
 
     GameObject(float startX, float startY, float startW, float startH, float startAngle = 0.0f) 
     	: x(startX), y(startY), width(startW), height(startH), angle(startAngle), 
@@ -379,22 +451,26 @@ public:
 
     void update(const std::vector<GameObject*>& otherObjects) {
         physics.update(otherObjects);
-		texture.x = (int)x;    texture.x = (int)x;
-    texture.y = (int)y;
-    texture.width = (int)width;
-    texture.height = (int)height;
-    texture.angle = (float)angle;
+		texture.x = (int)x;
     	texture.y = (int)y;
+    	texture.width = (int)width;
+    	texture.height = (int)height;
     	texture.angle = (float)angle;
     }
 
-    void addCollider(float w, float h, float a) {
-        Collider col;
-        col.width = w;
-        col.height = h;
-		col.angle = a;
-        colliderArray.push_back(col);
-    }
+    
+	void addCollider() {
+    	addCollider(width, height, angle);
+	}
+
+	void addCollider(float w, float h, float a) {
+    	Collider col;
+    	col.width = w;
+    	col.height = h;
+    	col.angle = a;
+    	colliderArray.push_back(col);
+	}
+
 };
 
 
@@ -402,18 +478,20 @@ public:
 //========================================Camera=========================================
 class CinematicCamera {
 public:
-	GameObject * Target;
+    GameObject * Target;
     float x = 0, y = 0;
     float lerpSpeed = 0.05f;
     float lookAhead = 50.0f;
 
     void update(SDL_Window *window, Vector2D Velocity = {0, 0}) {
-        Vector2D Movement = Engine_GetAxis::All();
-		int WindowWidth, WindowHeight;
-		SDL_GetWindowSize(window, &WindowWidth, &WindowHeight);
+        int WindowWidth, WindowHeight;
+        SDL_GetWindowSize(window, &WindowWidth, &WindowHeight);
 
-        float targetX = Target->x + (Target->width - WindowWidth / 2.0f) + (Velocity.x * lookAhead);
-        float targetY = Target->y + (Target->height - WindowHeight / 2.0f) + (Velocity.y * lookAhead);
+        float centerX = Target->x + Target->width / 2.0f;
+        float centerY = Target->y + Target->height / 2.0f;
+
+        float targetX = centerX - (WindowWidth / 2.0f) + (Velocity.x * lookAhead);
+        float targetY = centerY - (WindowHeight / 2.0f) + (Velocity.y * lookAhead);
 
         x += (targetX - x) * lerpSpeed;
         y += (targetY - y) * lerpSpeed;
