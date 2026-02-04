@@ -87,3 +87,42 @@ void PhysicsBody::update(const std::vector<GameObject*>& otherObjects) {
 		velocity.y = 0;
 	}
 }
+
+
+void ISODraw_RowLeft(float startX, float startY, SDL_Renderer* renderer, const std::vector<int>& row_map, const std::unordered_map<int, Tile*>& tile_library, float camX, float camY) {
+	int lastX = startX, lastY = startY;
+	for (int i = 0; i < row_map.size(); i++){
+		int tileID = row_map[i];
+            if (tile_library.find(tileID) != tile_library.end() && tile_library.at(tileID) != nullptr) {
+                Tile* currentTile = tile_library.at(tileID);
+                lastX = currentTile->texture.x = lastX - (currentTile->offsetX * currentTile->scale);
+                lastY = currentTile->texture.y = lastY + (currentTile->offsetY * currentTile->scale);                
+                currentTile->texture.draw(renderer, camX, camY);
+            }
+	}
+}
+void ISODraw_RowRight(float startX, float startY, SDL_Renderer* renderer, const std::vector<int>& row_map, const std::unordered_map<int, Tile*>& tile_library, float camX, float camY) {
+	int lastX = startX, lastY = startY;
+	for (int i = 0; i < row_map.size(); i++){
+		int tileID = row_map[i];
+            if (tile_library.find(tileID) != tile_library.end() && tile_library.at(tileID) != nullptr) {
+                Tile* currentTile = tile_library.at(tileID);
+                lastX = currentTile->texture.x = lastX + (currentTile->offsetX * currentTile->scale);
+                lastY = currentTile->texture.y = lastY + (currentTile->offsetY * currentTile->scale);                
+                currentTile->texture.draw(renderer, camX, camY);
+            }
+	}
+}
+
+void ISODraw_Rectangle(float startX, float startY, SDL_Renderer* renderer, const std::vector<std::vector<int>>& rect_map, const std::unordered_map<int, Tile*>& tile_library, float camX, float camY) {
+	int lastX = startX, lastY = startY;
+    for (int i = 0; i < rect_map.size(); i++) {
+		ISODraw_RowRight(lastX, lastY, renderer, rect_map[i], tile_library, camX, camY);
+		if (tile_library.find(rect_map[i][0]) != tile_library.end() && tile_library.at(rect_map[i][0]) != nullptr) {
+            Tile* firstTile = tile_library.at(rect_map[i][0]);
+			lastX -= firstTile->offsetX * firstTile->scale;
+			lastY += firstTile->offsetY * firstTile->scale;
+        }
+
+	}
+}

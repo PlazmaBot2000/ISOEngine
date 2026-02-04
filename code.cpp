@@ -5,13 +5,6 @@
 #include <iostream>
 #include <vector>
 
-class Tile {
-public:
-    int offsetX, offsetY;
-    Texture texture;
-	float scale = 1;
-};
-
 std::unordered_map<int, Tile*> TileLib;
 std::vector<std::vector<int>> map = {
     {1, 1, 1, 1, 1, 1, 1, 1},
@@ -47,48 +40,9 @@ void Move() {
     }
 }
 
-void ISODraw_RowLeft(float startX, float startY, SDL_Renderer* renderer, const std::vector<int>& row_map, const std::unordered_map<int, Tile*>& tile_library) {
-	int lastX = startX, lastY = startY;
-	for (int i = 0; i < row_map.size(); i++){
-		int tileID = row_map[i];
-            if (tile_library.find(tileID) != tile_library.end() && tile_library.at(tileID) != nullptr) {
-                Tile* currentTile = tile_library.at(tileID);
-                lastX = currentTile->texture.x = lastX - (currentTile->offsetX * currentTile->scale);
-                lastY = currentTile->texture.y = lastY + (currentTile->offsetY * currentTile->scale);                
-                currentTile->texture.draw(renderer, camera.x, camera.y);
-            }
-	}
-}
-void ISODraw_RowRight(float startX, float startY, SDL_Renderer* renderer, const std::vector<int>& row_map, const std::unordered_map<int, Tile*>& tile_library) {
-	int lastX = startX, lastY = startY;
-	for (int i = 0; i < row_map.size(); i++){
-		int tileID = row_map[i];
-            if (tile_library.find(tileID) != tile_library.end() && tile_library.at(tileID) != nullptr) {
-                Tile* currentTile = tile_library.at(tileID);
-                lastX = currentTile->texture.x = lastX + (currentTile->offsetX * currentTile->scale);
-                lastY = currentTile->texture.y = lastY + (currentTile->offsetY * currentTile->scale);                
-                currentTile->texture.draw(renderer, camera.x, camera.y);
-            }
-	}
-}
-
-void ISODraw_Rectangle(float startX, float startY, SDL_Renderer* renderer, const std::vector<std::vector<int>>& rect_map, const std::unordered_map<int, Tile*>& tile_library) {
-	int lastX = startX, lastY = startY;
-    for (int i = 0; i < rect_map.size(); i++) {
-		ISODraw_RowRight(lastX, lastY, renderer, rect_map[i], tile_library);
-		if (tile_library.find(rect_map[i][0]) != tile_library.end() && tile_library.at(rect_map[i][0]) != nullptr) {
-            Tile* firstTile = tile_library.at(rect_map[i][0]);
-			lastX -= firstTile->offsetX * firstTile->scale;
-			lastY += firstTile->offsetY * firstTile->scale;
-        }
-
-	}
-}
 
 void Draw(SDL_Window* window, SDL_Renderer* renderer) {
-    //ISODraw_RowRight(300, 300, renderer, rowMap, TileLib);
-    //ISODraw_RowLeft(300 + 32 * 4, 300, renderer, rowMap, TileLib);
-	ISODraw_Rectangle(300, 300, renderer, map, TileLib);
+	ISODraw_Rectangle(300, 300, renderer, map, TileLib, camera.x, camera.y);
     player.texture.draw(renderer, camera.x, camera.y);
 }
 

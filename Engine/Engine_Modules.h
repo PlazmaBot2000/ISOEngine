@@ -3,6 +3,7 @@
 #include <cmath>
 #include <vector>
 #include <algorithm>
+#include <unordered_map>
 #include <iostream>
 
 #ifndef MODULES_H
@@ -499,6 +500,17 @@ public:
 };
 
 
+class Tile {
+public:
+    int offsetX, offsetY;
+    Texture texture;
+	float scale = 1;
+};
+
+
 bool Engine_Delay(int time, int& Prev_Tick);
 int Engine_Random(int upper, int lower);
+void ISODraw_RowLeft(float startX, float startY, SDL_Renderer* renderer, const std::vector<int>& row_map, const std::unordered_map<int, Tile*>& tile_library, float camX = 0, float camY = 0);
+void ISODraw_RowRight(float startX, float startY, SDL_Renderer* renderer, const std::vector<int>& row_map, const std::unordered_map<int, Tile*>& tile_library, float camX = 0, float camY = 0);
+void ISODraw_Rectangle(float startX, float startY, SDL_Renderer* renderer, const std::vector<std::vector<int>>& rect_map, const std::unordered_map<int, Tile*>& tile_library, float camX = 0, float camY = 0);
 #endif
