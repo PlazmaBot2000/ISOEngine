@@ -76,7 +76,7 @@ int start(SDL_Window* window, SDL_Renderer* renderer) {
     player.addCollider(player.width, player.height, player.angle);
 	
     camera.Target = &player;
-    camera.lookAhead = 150;
+    //camera.lookAhead = 150;
 
     return 0;
 }
@@ -97,7 +97,7 @@ int loop(SDL_Window* window, SDL_Renderer* renderer) {
     Move();
     
     player.update(Scene);
-    camera.update(window, Movement);
+    camera.update(window);
 
     Draw(window, renderer);
     return 0;

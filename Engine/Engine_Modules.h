@@ -278,106 +278,119 @@ enum class ScaleMode {
 
 
 class Texture {
+private:
+    SDL_Texture* cachedRepeat = nullptr;
+    int texW = 0, texH = 0;
+    int lastW = 0, lastH = 0;
+
 public:
-    int x, y, width, height, offsetX, offsetY = 0;
+	SDL_Texture* texture = nullptr;
+    int x = 0, y = 0, width = 0, height = 0;
     float angle = 0.0;
-    
-    SDL_Texture* texture = nullptr;
-    int texW = 0;
-    int texH = 0;
-
     ScaleMode scaleMode = ScaleMode::Stretch;
-
 
     Texture() {}
 
+    ~Texture() {
+        cleanup();
+    }
+
+    void cleanup() {
+        if (texture) { SDL_DestroyTexture(texture); texture = nullptr; }
+        if (cachedRepeat) { SDL_DestroyTexture(cachedRepeat); cachedRepeat = nullptr; }
+    }
 
     void loadTexture(SDL_Renderer* renderer, const char* filePath) {
-        if (texture) SDL_DestroyTexture(texture);
+        cleanup();
         texture = IMG_LoadTexture(renderer, filePath);
         if (texture) {
             SDL_QueryTexture(texture, NULL, NULL, &texW, &texH);
-            if (width == 0) width = (float)texW;
-            if (height == 0) height = (float)texH;
+            if (width == 0) width = texW;
+            if (height == 0) height = texH;
         }
     }
 
-    ~Texture() {
-        if (texture) SDL_DestroyTexture(texture);
-    }
+    void draw(SDL_Renderer* renderer, int camX = 0, int camY = 0) {
+        if (!texture) return;
 
-	void draw(SDL_Renderer* renderer, int camX = 0, int camY = 0) const {
-	    if (!texture) return;
-	
-	    Uint8 oldR, oldG, oldB, oldA;
-	    SDL_GetRenderDrawColor(renderer, &oldR, &oldG, &oldB, &oldA);
-	
-	    if (scaleMode == ScaleMode::Repeat) {
-	        SDL_Texture* target = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, 
-	                                            SDL_TEXTUREACCESS_TARGET, width, height);
-	        SDL_SetTextureBlendMode(target, SDL_BLENDMODE_BLEND);
-	        
-	        SDL_Texture* oldTarget = SDL_GetRenderTarget(renderer);
-	        SDL_SetRenderTarget(renderer, target);
-	        
-	        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0); 
-	        SDL_RenderClear(renderer);
-	
-	        for (int ty = 0; ty < height; ty += texH) {
-	            for (int tx = 0; tx < width; tx += texW) {
-	                SDL_Rect tileRect = { tx, ty, texW, texH };
-	                SDL_RenderCopy(renderer, texture, NULL, &tileRect);
-	            }
-	        }
-	
-	        SDL_SetRenderTarget(renderer, oldTarget);
-	        
-	        SDL_Rect dest = { x + offsetX - camX, y + offsetY - camY, width, height };
-	        SDL_RenderCopyEx(renderer, target, NULL, &dest, angle, NULL, SDL_FLIP_NONE);
-	        
-	        SDL_DestroyTexture(target);
-	    } else {
-	        SDL_Rect dest = { x - camX, y - camY, width, height };
-	        SDL_RenderCopyEx(renderer, texture, NULL, &dest, angle, NULL, SDL_FLIP_NONE);
-	    }
-	
-	    SDL_SetRenderDrawColor(renderer, oldR, oldG, oldB, oldA);
-	}
+        int screenW, screenH;
+        SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
 
+        int drawX = x - camX;
+        int drawY = y - camY;
 
-private:
-    void drawRepeat(SDL_Renderer* renderer, float drawX, float drawY) const {
-        SDL_Texture* target = SDL_CreateTexture(renderer, 
-            SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, (int)width, (int)height);
-        
-        if (!target) return;
+        int margin = (angle != 0) ? std::max(width, height) : 0;
+        if (drawX + width + margin < 0 || drawX - margin > screenW ||
+            drawY + height + margin < 0 || drawY - margin > screenH) {
+            return; 
+        }
 
-        SDL_SetTextureBlendMode(target, SDL_BLENDMODE_BLEND);
-
-        SDL_Texture* oldTarget = SDL_GetRenderTarget(renderer);
-        SDL_SetRenderTarget(renderer, target);
-
-        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0); 
-        SDL_RenderClear(renderer);
-
-        for (int ty = 0; ty < (int)height; ty += texH) {
-            for (int tx = 0; tx < (int)width; tx += texW) {
-                SDL_Rect tileRect = { tx, ty, texH, texW };
-                
-                SDL_Rect srcRect = { 0, 0, texW, texH };
-                if (tx + texW > (int)width) { tileRect.w = (int)width - tx; srcRect.w = tileRect.w; }
-                if (ty + texH > (int)height) { tileRect.h = (int)height - ty; srcRect.h = tileRect.h; }
-
-                SDL_RenderCopy(renderer, texture, &srcRect, &tileRect);
+        switch (scaleMode) {
+            case ScaleMode::Stretch: {
+                SDL_Rect dest = { drawX, drawY, width, height };
+                SDL_RenderCopyEx(renderer, texture, NULL, &dest, angle, NULL, SDL_FLIP_NONE);
+                break;
+            }
+            case ScaleMode::Fit:
+            case ScaleMode::Fill: {
+                renderProportional(renderer, drawX, drawY, scaleMode == ScaleMode::Fill);
+                break;
+            }
+            case ScaleMode::Repeat: {
+                renderRepeat(renderer, drawX, drawY);
+                break;
             }
         }
+    }
 
-        SDL_SetRenderTarget(renderer, oldTarget);
+private:
+    void renderProportional(SDL_Renderer* renderer, int drawX, int drawY, bool isFill) {
+        float scaleW = (float)width / texW;
+        float scaleH = (float)height / texH;
+        float scale = isFill ? std::max(scaleW, scaleH) : std::min(scaleW, scaleH);
 
-        SDL_Rect finalDest = { (int)drawX, (int)drawY, (int)width, (int)height };
-        SDL_RenderCopyEx(renderer, target, NULL, &finalDest, (double)angle, NULL, SDL_FLIP_NONE);
+        int finalW = (int)(texW * scale);
+        int finalH = (int)(texH * scale);
+        
+        int offsetX = (width - finalW) / 2;
+        int offsetY = (height - finalH) / 2;
 
-        SDL_DestroyTexture(target);
+        SDL_Rect dest = { drawX + offsetX, drawY + offsetY, finalW, finalH };
+        
+        if (isFill) {
+            SDL_Rect clip = { drawX, drawY, width, height };
+            SDL_RenderSetClipRect(renderer, &clip);
+            SDL_RenderCopyEx(renderer, texture, NULL, &dest, angle, NULL, SDL_FLIP_NONE);
+            SDL_RenderSetClipRect(renderer, NULL);
+        } else {
+            SDL_RenderCopyEx(renderer, texture, NULL, &dest, angle, NULL, SDL_FLIP_NONE);
+        }
+    }
+
+    void renderRepeat(SDL_Renderer* renderer, int drawX, int drawY) {
+        if (!cachedRepeat || lastW != width || lastH != height) {
+            if (cachedRepeat) SDL_DestroyTexture(cachedRepeat);
+            cachedRepeat = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, width, height);
+            SDL_SetTextureBlendMode(cachedRepeat, SDL_BLENDMODE_BLEND);
+
+            SDL_Texture* oldTarget = SDL_GetRenderTarget(renderer);
+            SDL_SetRenderTarget(renderer, cachedRepeat);
+            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+            SDL_RenderClear(renderer);
+
+            for (int ty = 0; ty < height; ty += texH) {
+                for (int tx = 0; tx < width; tx += texW) {
+                    SDL_Rect tileRect = { tx, ty, std::min(texW, width - tx), std::min(texH, height - ty) };
+                    SDL_Rect srcRect = { 0, 0, tileRect.w, tileRect.h };
+                    SDL_RenderCopy(renderer, texture, &srcRect, &tileRect);
+                }
+            }
+            SDL_SetRenderTarget(renderer, oldTarget);
+            lastW = width; lastH = height;
+        }
+
+        SDL_Rect dest = { drawX, drawY, width, height };
+        SDL_RenderCopyEx(renderer, cachedRepeat, NULL, &dest, angle, NULL, SDL_FLIP_NONE);
     }
 };
 
@@ -477,27 +490,49 @@ public:
 
 
 //========================================Camera=========================================
+
+
 class CinematicCamera {
 public:
     GameObject * Target;
     float x = 0, y = 0;
-    float lerpSpeed = 0.05f;
-    float lookAhead = 50.0f;
+    float lerpSpeed = 0.05f; 
+    float maxDistance = 100.0f;
 
-    void update(SDL_Window *window, Vector2D Velocity = {0, 0}) {
+    void update(SDL_Window *window) {
+        if (!Target) return;
+
         int WindowWidth, WindowHeight;
         SDL_GetWindowSize(window, &WindowWidth, &WindowHeight);
 
-        float centerX = Target->x + Target->width / 2.0f;
-        float centerY = Target->y + Target->height / 2.0f;
+        float targetX = (Target->x + Target->width / 2.0f) - (WindowWidth / 2.0f);
+        float targetY = (Target->y + Target->height / 2.0f) - (WindowHeight / 2.0f);
 
-        float targetX = centerX - (WindowWidth / 2.0f) + (Velocity.x * lookAhead);
-        float targetY = centerY - (WindowHeight / 2.0f) + (Velocity.y * lookAhead);
+        float diffX = targetX - x;
+        float diffY = targetY - y;
 
-        x += (targetX - x) * lerpSpeed;
-        y += (targetY - y) * lerpSpeed;
+        float currentDist = std::sqrt(diffX * diffX + diffY * diffY);
+
+        if (currentDist > maxDistance) {
+            float dirX = diffX / currentDist;
+            float dirY = diffY / currentDist;
+
+            x = targetX - (dirX * maxDistance);
+            y = targetY - (dirY * maxDistance);
+            
+            diffX = targetX - x;
+            diffY = targetY - y;
+        }
+
+        if (std::abs(diffX) < 0.1f) x = targetX;
+        else x += diffX * lerpSpeed;
+
+        if (std::abs(diffY) < 0.1f) y = targetY;
+        else y += diffY * lerpSpeed;
     }
 };
+
+
 
 
 class Tile {
