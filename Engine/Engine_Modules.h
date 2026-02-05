@@ -9,6 +9,8 @@
 #ifndef MODULES_H
 #define MODULES_H
 
+const float DEG_TO_RAD = 3.14159265f / 180.0f;
+
 
 //=======================================Vector2D========================================
 class Vector2D {
@@ -27,6 +29,11 @@ public:
 
 
 //=======================================Colliders=======================================
+
+
+class TriangleCollider;
+
+
 class Collider {
 public:
     struct CollisionResult {
@@ -44,15 +51,9 @@ public:
     Collider(float x, float y, float width, float height, float angle = 0.0f) 
         : x(x), y(y), width(width), height(height), angle(angle) {}
 
-    bool checkCollision(const Collider& b) const {
-        if (angle == 0.0f && b.angle == 0.0f) {
-            return (x < b.x + b.width &&
-                    x + width > b.x &&
-                    y < b.y + b.height &&
-                    y + height > b.y);
-        }
-        return checkCollisionSAT(b);
-    }
+    bool checkCollision(const Collider& b) const;
+
+	bool checkCollision(const TriangleCollider& tri) const;
 
 	bool contains(float px, float py) const {
     	if (angle == 0.0f) {
@@ -73,7 +74,27 @@ public:
     	float localY = dx * sinA + dy * cosA;
 
     	return (localX >= -width / 2.0f && localX <= width / 2.0f && localY >= -height / 2.0f && localY <= height / 2.0f);
-}
+	}
+
+
+	std::vector<Vector2D> getVertices() const {
+        float cx = x + width / 2.0f;
+        float cy = y + height / 2.0f;
+        
+        float angleRad = angle * DEG_TO_RAD;
+        float cosA = cosf(angleRad);
+        float sinA = sinf(angleRad);
+
+        std::vector<Vector2D> vertices(4);
+        float dx[4] = {-width/2, width/2, width/2, -width/2};
+        float dy[4] = {-height/2, -height/2, height/2, height/2};
+
+        for (int i = 0; i < 4; i++) {
+            vertices[i].x = cx + dx[i] * cosA - dy[i] * sinA;
+            vertices[i].y = cy + dx[i] * sinA + dy[i] * cosA;
+        }
+        return vertices;
+	}
 
     
 	void draw(SDL_Renderer* renderer, float cameraX = 0, float cameraY = 0) const {
@@ -153,26 +174,6 @@ public:
 	}
 
 private:
-    const float DEG_TO_RAD = 3.14159265f / 180.0f;
-
-    std::vector<Vector2D> getVertices() const {
-        float cx = x + width / 2.0f;
-        float cy = y + height / 2.0f;
-        
-        float angleRad = angle * DEG_TO_RAD;
-        float cosA = cosf(angleRad);
-        float sinA = sinf(angleRad);
-
-        std::vector<Vector2D> vertices(4);
-        float dx[4] = {-width/2, width/2, width/2, -width/2};
-        float dy[4] = {-height/2, -height/2, height/2, height/2};
-
-        for (int i = 0; i < 4; i++) {
-            vertices[i].x = cx + dx[i] * cosA - dy[i] * sinA;
-            vertices[i].y = cy + dx[i] * sinA + dy[i] * cosA;
-        }
-        return vertices;
-    }
 
     bool checkCollisionSAT(const Collider& b) const {
         auto v1 = getVertices();
@@ -205,6 +206,139 @@ private:
         return checkAxis(v1, v2) && checkAxis(v2, v1);
     }
 };  
+
+
+class TriangleCollider {
+public:
+    struct CollisionResult {
+        bool collided = false;
+        Vector2D normal = {0, 0};
+        float depth = 0;
+    };
+
+    float x, y;
+    Vector2D p1, p2, p3;
+    float angle = 0.0f;
+
+    TriangleCollider(float x, float y, Vector2D pt1, Vector2D pt2, Vector2D pt3, float angle = 0.0f)
+        : x(x), y(y), p1(pt1), p2(pt2), p3(pt3), angle(angle) {}
+
+    std::vector<Vector2D> getVertices() const {
+        float angleRad = angle * (3.14159265f / 180.0f);
+        float cosA = cosf(angleRad);
+        float sinA = sinf(angleRad);
+
+        auto transform = [&](const Vector2D& p) -> Vector2D {
+            return {
+                x + p.x * cosA - p.y * sinA,
+                y + p.x * sinA + p.y * cosA
+            };
+        };
+
+        return { transform(p1), transform(p2), transform(p3) };
+    }
+
+    bool checkCollision(const TriangleCollider& other) const {
+        return getCollisionData(other).collided;
+    }
+
+    bool contains(float px, float py) const {
+        auto v = getVertices();
+        auto sign = [](Vector2D p1, Vector2D p2, Vector2D p3) {
+            return (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y);
+        };
+
+        float d1 = sign({px, py}, v[0], v[1]);
+        float d2 = sign({px, py}, v[1], v[2]);
+        float d3 = sign({px, py}, v[2], v[0]);
+
+        bool has_neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+        bool has_pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+
+        return !(has_neg && has_pos);
+    }
+
+
+	void draw(SDL_Renderer* renderer, float cameraX = 0, float cameraY = 0) const {
+	    auto vertices = getVertices();
+	    Uint8 r, g, b, a;
+	    
+	    SDL_GetRenderDrawColor(renderer, &r, &g, &b, &a);
+	    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+	
+	    for (int i = 0; i < 3; i++) {
+	        const Vector2D& p1 = vertices[i];
+	        const Vector2D& p2 = vertices[(i + 1) % 3];
+	        
+	        SDL_RenderDrawLine(renderer, 
+	            static_cast<int>(p1.x - cameraX), 
+	            static_cast<int>(p1.y - cameraY), 
+	            static_cast<int>(p2.x - cameraX), 
+	            static_cast<int>(p2.y - cameraY)
+	        );
+	    }
+	    
+	    SDL_SetRenderDrawColor(renderer, r, g, b, a);
+	}
+
+
+    template<typename T>
+    CollisionResult getCollisionData(const T& b) const {
+        auto v1 = getVertices();
+        auto v2 = b.getVertices();
+        CollisionResult result;
+        result.collided = true;
+        float minOverlap = 1e10f;
+
+        auto checkAxes = [&](const std::vector<Vector2D>& poly1, const std::vector<Vector2D>& poly2) {
+            for (size_t i = 0; i < poly1.size(); i++) {
+                Vector2D p1 = poly1[i];
+                Vector2D p2 = poly1[(i + 1) % poly1.size()];
+                
+                Vector2D axis = {-(p2.y - p1.y), p2.x - p1.x};
+                float len = sqrtf(axis.x * axis.x + axis.y * axis.y);
+                if (len != 0) { axis.x /= len; axis.y /= len; }
+
+                float min1, max1, min2, max2;
+                auto project = [&](const std::vector<Vector2D>& poly, float& min, float& max) {
+                    min = max = (poly[0].x * axis.x + poly[0].y * axis.y);
+                    for (const auto& p : poly) {
+                        float proj = (p.x * axis.x + p.y * axis.y);
+                        min = std::min(min, proj);
+                        max = std::max(max, proj);
+                    }
+                };
+
+                project(poly1, min1, max1);
+                project(poly2, min2, max2);
+
+                if (max1 < min2 || max2 < min1) return false;
+
+                float overlap = std::min(max1, max2) - std::max(min1, min2);
+                if (overlap < minOverlap) {
+                    minOverlap = overlap;
+                    result.normal = axis;
+                    result.depth = overlap;
+                }
+            }
+            return true;
+        };
+
+        if (!checkAxes(v1, v2) || !checkAxes(v2, v1)) {
+            return {false, {0,0}, 0};
+        }
+
+        Vector2D centerA = {x, y};
+        Vector2D centerB = { (v2[0].x + v2[2].x)/2, (v2[0].y + v2[2].y)/2 }; 
+        Vector2D dir = centerA - centerB;
+        if ((dir.x * result.normal.x + dir.y * result.normal.y) < 0) {
+            result.normal.x *= -1;
+            result.normal.y *= -1;
+        }
+
+        return result;
+    }
+};
 
 
 //=========================================Input=========================================

@@ -20,8 +20,11 @@ std::vector<int> rowMap = {1, 2, 1, 2, 1, 2, 1, 2};
 
 int MOVEMENT_MULT = 5;
 
+TriangleCollider tri(200, 200, {0, -20}, {20, 20}, {-20, 20}, 0);
+
+
 GameObject player;
-Tile floorTile;
+Tile Tile1, Tile2;
 Vector2D Movement;
 
 int WindowWidth, WindowHeight = 0;
@@ -44,6 +47,7 @@ void Move() {
 void Draw(SDL_Window* window, SDL_Renderer* renderer) {
 	ISODraw_Rectangle(300, 300, renderer, map, TileLib, camera.x, camera.y);
     player.texture.draw(renderer, camera.x, camera.y);
+	tri.draw(renderer, camera.x, camera.y);
 }
 
 int start(SDL_Window* window, SDL_Renderer* renderer) {	
@@ -51,22 +55,30 @@ int start(SDL_Window* window, SDL_Renderer* renderer) {
     SDL_GetWindowSize(window, &WindowWidth, &WindowHeight);
 
     player.texture.loadTexture(renderer, "Assets/Textures/player.png");
-    floorTile.texture.loadTexture(renderer, "Assets/Textures/tile.png");
+    Tile1.texture.loadTexture(renderer, "Assets/Textures/tile1.png");
+	Tile2.texture.loadTexture(renderer, "Assets/Textures/tile2.png");
 
-    if (!player.texture.texture || !floorTile.texture.texture) {
+    if (!player.texture.texture || !Tile1.texture.texture || !Tile2.texture.texture) {
         std::cerr << "Ошибка загрузки текстур: " << IMG_GetError() << std::endl;
         return 1;
     }
 
-    floorTile.texture.width *= 4;
-    floorTile.texture.height *= 4;
-	floorTile.scale = 4;
+    Tile1.texture.width *= 4;
+    Tile1.texture.height *= 4;
+	Tile1.scale = 4;
     
-    floorTile.offsetX = 16;
-    floorTile.offsetY = 8;
+    Tile1.offsetX = 16;
+    Tile1.offsetY = 8;
 
-    TileLib[0] = &floorTile;
-	TileLib[1] = &floorTile;
+	Tile2.texture.width *= 4;
+    Tile2.texture.height *= 4;
+	Tile2.scale = 4;
+    
+    Tile2.offsetX = 16;
+    Tile2.offsetY = 8;
+
+    TileLib[0] = &Tile1;
+	TileLib[1] = &Tile2;
 
     player.x = 0; 
     player.y = 0;	

@@ -16,6 +16,20 @@ int Engine_Random(int upper, int lower){
 	return (rand() % (upper-lower) + 1);
 }
 
+bool Collider::checkCollision(const Collider& b) const {
+    if (angle == 0.0f && b.angle == 0.0f) {
+        return (x < b.x + b.width &&
+            x + width > b.x &&
+            y < b.y + b.height &&
+            y + height > b.y);
+    }
+	return checkCollisionSAT(b);
+}
+
+bool Collider::checkCollision(const TriangleCollider& tri) const {
+    return tri.getCollisionData(*this).collided;
+}
+
 //=======================================Physics======================================
 void PhysicsBody::syncParentAndColliders() {
     if (!parent) return;
